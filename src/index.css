@@ -13,3 +13,7 @@ body {
   width: 100%;
   position: relative;
 }
+
+input, select, textarea {
+  font-size: 16px;
+}
