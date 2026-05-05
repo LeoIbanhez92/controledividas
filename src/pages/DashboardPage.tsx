@@ -129,11 +129,14 @@ export function DashboardPage() {
     const totalFixasMensal = dividasFixas
         .filter((d) => d.ativa)
         .reduce((sum, d) => sum + Number(d.valorMensal), 0);
+    const totalFixasPagas = dividasFixas
+        .filter((d) => d.ativa && pagasIds.has(d.id))
+        .reduce((sum, d) => sum + Number(d.valorMensal), 0);
     const totalCartaoMensal = dividas.reduce(
         (sum, d) => sum + Number(d.valor) / Number(d.quantidadeParcelas),
         0
     );
-    const totalGeral = totalCartaoMensal + totalFixasMensal;
+    const totalGeral = totalCartaoMensal + totalFixasMensal - totalFixasPagas;
 
     // Agrupar dívidas por titular
     const dividasPorTitular: { titular: string; itens: typeof dividas }[] = [];
