@@ -129,15 +129,11 @@ export function DashboardPage() {
     const totalFixasMensal = dividasFixas
         .filter((d) => d.ativa)
         .reduce((sum, d) => sum + Number(d.valorMensal), 0);
-    const totalFixasPagas = dividasFixas
-        .filter((d) => d.ativa && pagasIds.has(d.id))
-        .reduce((sum, d) => sum + Number(d.valorMensal), 0);
-    const totalValor = dividas.reduce((sum, d) => sum + Number(d.valor), 0) + totalFixasMensal;
-    const totalMensal = dividas.reduce(
+    const totalCartaoMensal = dividas.reduce(
         (sum, d) => sum + Number(d.valor) / Number(d.quantidadeParcelas),
         0
-    ) + totalFixasMensal - totalFixasPagas;
-    const totalParcelas = dividas.reduce((sum, d) => sum + d.quantidadeParcelas, 0);
+    );
+    const totalGeral = totalCartaoMensal + totalFixasMensal;
 
     // Agrupar dívidas por titular
     const dividasPorTitular: { titular: string; itens: typeof dividas }[] = [];
@@ -174,26 +170,21 @@ export function DashboardPage() {
             <main className="relative z-10 max-w-4xl mx-auto px-4 py-6">
                 {/* Stats */}
                 {!loading && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                        <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
-                            <p className="text-xs text-gray-500 uppercase tracking-wide">Dívidas no Cartão</p>
-                            <p className="text-xl sm:text-2xl font-bold text-gray-800 mt-1">{dividas.length}</p>
-                            <p className="text-xs text-gray-400 mt-1 hidden sm:block">{totalParcelas} parcelas no total</p>
-                        </div>
-                        <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
-                            <p className="text-xs text-gray-500 uppercase tracking-wide">Valor Total no Cartão</p>
-                            <p className="text-xl sm:text-2xl font-bold text-red-600 mt-1">{brl(totalValor)}</p>
-                            <p className="text-xs text-gray-400 mt-1 hidden sm:block">soma de todas as dívidas</p>
-                        </div>
+                    <div className="grid grid-cols-3 sm:grid-cols-3 gap-3 mb-6">
                         <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
                             <p className="text-xs text-gray-500 uppercase tracking-wide">Fixas/Mês</p>
                             <p className="text-xl sm:text-2xl font-bold text-purple-600 mt-1">{brl(totalFixasMensal)}</p>
                             <p className="text-xs text-gray-400 mt-1 hidden sm:block">{dividasFixas.filter(d => d.ativa).length} dívidas ativas</p>
                         </div>
                         <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
-                            <p className="text-xs text-gray-500 uppercase tracking-wide">Gasto Mensal</p>
-                            <p className="text-xl sm:text-2xl font-bold text-orange-500 mt-1">{brl(totalMensal)}</p>
+                            <p className="text-xs text-gray-500 uppercase tracking-wide">Cartão/Mês</p>
+                            <p className="text-xl sm:text-2xl font-bold text-orange-500 mt-1">{brl(totalCartaoMensal)}</p>
                             <p className="text-xs text-gray-400 mt-1 hidden sm:block">soma das parcelas mensais</p>
+                        </div>
+                        <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4">
+                            <p className="text-xs text-gray-500 uppercase tracking-wide">Total/Mês</p>
+                            <p className="text-xl sm:text-2xl font-bold text-red-600 mt-1">{brl(totalGeral)}</p>
+                            <p className="text-xs text-gray-400 mt-1 hidden sm:block">cartão + fixas no mês</p>
                         </div>
                     </div>
                 )}
@@ -201,7 +192,7 @@ export function DashboardPage() {
                 {/* Actions bar */}
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                        Dívidas
+                        Dívidas Cartão de Crédito
                     </h2>
                     <button
                         onClick={() => {
@@ -214,7 +205,7 @@ export function DashboardPage() {
                             <line x1="12" y1="5" x2="12" y2="19" />
                             <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
-                        Nova Dívida
+                        Nova Dívida Crédito
                     </button>
                 </div>
 
@@ -288,7 +279,7 @@ export function DashboardPage() {
                             <line x1="12" y1="5" x2="12" y2="19" />
                             <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
-                        Nova Fixa
+                        Nova Dívida Fixa
                     </button>
                 </div>
 
