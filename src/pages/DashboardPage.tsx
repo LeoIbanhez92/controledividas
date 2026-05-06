@@ -174,12 +174,24 @@ export function DashboardPage() {
         .reduce((sum, d) => sum + Number(d.valor) / Number(d.quantidadeParcelas), 0);
     const totalGeral = totalCartaoMensal - totalCartaoPago + totalFixasMensal - totalFixasPagas;
 
-    // Agrupar dívidas por bandeira
-    const dividasPorBandeira: { bandeira: string | null; label: string; itens: typeof dividas }[] = [];
+    // Agrupar dívidas: bandeira → titular
+    type GrupoBandeira = {
+        bandeira: string | null;
+        label: string;
+        titulares: { titular: string; itens: typeof dividas }[];
+        todosIds: number[];
+    };
+    const dividasPorBandeira: GrupoBandeira[] = [];
     const bandeirasUsadas = [...new Set(dividas.map((d) => d.bandeira ?? null))];
     bandeirasUsadas.forEach((b) => {
+        const itensBandeira = dividas.filter((d) => (d.bandeira ?? null) === b);
         const label = b ? (BANDEIRAS.find((x) => x.value === b)?.label ?? b) : 'Sem bandeira';
-        dividasPorBandeira.push({ bandeira: b, label, itens: dividas.filter((d) => (d.bandeira ?? null) === b) });
+        const titularesUnicos = [...new Set(itensBandeira.map((d) => d.nomeTitular ?? ''))];
+        const titulares = titularesUnicos.map((t) => ({
+            titular: t,
+            itens: itensBandeira.filter((d) => (d.nomeTitular ?? '') === t),
+        }));
+        dividasPorBandeira.push({ bandeira: b, label, titulares, todosIds: itensBandeira.map((d) => d.id) });
     });
 
     return (
@@ -272,50 +284,59 @@ export function DashboardPage() {
                     </div>
                 )}
 
-                {/* Debt list grouped by bandeira */}
+                {/* Debt list grouped by bandeira → titular (independente) */}
                 {!loading && dividas.length > 0 && (
-                    <div className="space-y-6">
-                        {dividasPorBandeira.map(({ bandeira, label, itens }) => {
-                            const subtotalMensal = itens.reduce((s, d) => s + Number(d.valor) / Number(d.quantidadeParcelas), 0);
-                            const ids = itens.map((d) => d.id);
-                            const todosPagos = ids.length > 0 && ids.every((id) => pagasCartaoIds.has(id));
-                            return (
-                                <div key={bandeira ?? '__sem__'}>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-base">💳</span>
-                                            <span className="text-sm font-semibold text-gray-700">{label}</span>
-                                            <button
-                                                onClick={() => handleToggleGrupo(ids)}
-                                                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                                                    todosPagos ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-green-50 hover:text-green-600'
-                                                }`}
-                                                title={todosPagos ? 'Desmarcar fatura paga' : 'Marcar fatura como paga'}
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                                    <polyline points="20 6 9 17 4 12" />
-                                                </svg>
-                                                {todosPagos ? 'Pago' : 'Pagar'}
-                                            </button>
+                    <div className="space-y-4">
+                        {dividasPorBandeira.map(({ bandeira, label, titulares }) => (
+                            titulares.map(({ titular, itens }) => {
+                                const ids = itens.map((d) => d.id);
+                                const subtotalMensal = itens.reduce((s, d) => s + Number(d.valor) / Number(d.quantidadeParcelas), 0);
+                                const todosPagos = ids.length > 0 && ids.every((id) => pagasCartaoIds.has(id));
+                                const chave = `${bandeira ?? '__sem__'}-${titular || '__sem_titular__'}`;
+                                return (
+                                    <div key={chave} className="bg-white/80 rounded-2xl border border-gray-200 p-4">
+                                        <div className="flex items-start justify-between gap-2 mb-4">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-base">💳</span>
+                                                <span className="text-sm font-bold text-gray-800">{label}</span>
+                                                {titular && (
+                                                    <>
+                                                        <span className="text-gray-300 text-sm">•</span>
+                                                        <span className="text-sm text-gray-500">👤 {titular}</span>
+                                                    </>
+                                                )}
+                                                <button
+                                                    onClick={() => handleToggleGrupo(ids)}
+                                                    className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                                                        todosPagos ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-green-50 hover:text-green-600'
+                                                    }`}
+                                                    title={todosPagos ? 'Desmarcar fatura paga' : 'Marcar fatura como paga'}
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                        <polyline points="20 6 9 17 4 12" />
+                                                    </svg>
+                                                    {todosPagos ? 'Pago' : 'Pagar'}
+                                                </button>
+                                            </div>
+                                            <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full shrink-0">
+                                                {brl(subtotalMensal)}/mês
+                                            </span>
                                         </div>
-                                        <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
-                                            {brl(subtotalMensal)}/mês
-                                        </span>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            {itens.map((divida) => (
+                                                <DividaCard
+                                                    key={divida.id}
+                                                    divida={divida}
+                                                    pago={pagasCartaoIds.has(divida.id)}
+                                                    onEdit={handleEdit}
+                                                    onDelete={(id) => setDeleteConfirmId(id)}
+                                                />
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        {itens.map((divida) => (
-                                            <DividaCard
-                                                key={divida.id}
-                                                divida={divida}
-                                                pago={pagasCartaoIds.has(divida.id)}
-                                                onEdit={handleEdit}
-                                                onDelete={(id) => setDeleteConfirmId(id)}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })
+                        ))}
                     </div>
                 )}
 
