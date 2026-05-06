@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import type { Divida, DividaDto } from '../api/dividas';
+import type { Divida, DividaDto, BandeiraCartao } from '../api/dividas';
+import { BANDEIRAS } from '../api/dividas';
 
 interface DividaModalProps {
     divida?: Divida | null;
@@ -13,6 +14,7 @@ export function DividaModal({ divida, onSave, onClose }: DividaModalProps) {
     const [valorParcela, setValorParcela] = useState('');
     const [quantidadeParcelas, setQuantidadeParcelas] = useState('1');
     const [dataVencimentoPrimeiraParcela, setDataVencimento] = useState('');
+    const [bandeira, setBandeira] = useState<BandeiraCartao | ''>('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -24,6 +26,7 @@ export function DividaModal({ divida, onSave, onClose }: DividaModalProps) {
             setValorParcela(parcela.toFixed(2));
             setQuantidadeParcelas(String(divida.quantidadeParcelas));
             setDataVencimento(divida.dataVencimentoPrimeiraParcela.split('T')[0]);
+            setBandeira(divida.bandeira ?? '');
         }
     }, [divida]);
 
@@ -40,6 +43,7 @@ export function DividaModal({ divida, onSave, onClose }: DividaModalProps) {
                 quantidadeParcelas: parcelas,
                 dataVencimentoPrimeiraParcela: dataVencimentoPrimeiraParcela,
                 ...(nomeTitular.trim() ? { nomeTitular: nomeTitular.trim() } : {}),
+                ...(bandeira ? { bandeira } : { bandeira: null }),
             });
             onClose();
         } catch (err: unknown) {
@@ -146,6 +150,22 @@ export function DividaModal({ divida, onSave, onClose }: DividaModalProps) {
                                 })}
                             </p>
                         )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Bandeira / Banco <span className="text-gray-400 font-normal">(opcional)</span>
+                        </label>
+                        <select
+                            value={bandeira}
+                            onChange={(e) => setBandeira(e.target.value as BandeiraCartao | '')}
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                        >
+                            <option value="">Selecione (opcional)</option>
+                            {BANDEIRAS.map((b) => (
+                                <option key={b.value} value={b.value}>{b.label}</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div>

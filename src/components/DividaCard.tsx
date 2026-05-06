@@ -2,6 +2,7 @@ import type { Divida } from '../api/dividas';
 
 interface DividaCardProps {
     divida: Divida;
+    pago: boolean;
     onEdit: (divida: Divida) => void;
     onDelete: (id: number) => void;
 }
@@ -14,18 +15,18 @@ const formatDate = (dateStr: string) => {
     return date.toLocaleDateString('pt-BR');
 };
 
-export function DividaCard({ divida, onEdit, onDelete }: DividaCardProps) {
+export function DividaCard({ divida, pago, onEdit, onDelete }: DividaCardProps) {
     const valorParcela = Number(divida.valor) / Number(divida.quantidadeParcelas);
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between gap-2 mb-3">
+        <div className={`rounded-xl border p-4 hover:shadow-md transition-shadow ${pago ? 'bg-green-50/50 border-green-200' : 'bg-white border-gray-200'}`}>
+            <div className="flex items-start gap-2 mb-3">
                 <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-800 truncate">{divida.descricao}</h3>
+                    <h3 className={`font-semibold truncate ${pago ? 'line-through text-gray-400' : 'text-gray-800'}`}>{divida.descricao}</h3>
                     {divida.nomeTitular && (
                         <p className="text-xs text-gray-500 mt-0.5">👤 {divida.nomeTitular}</p>
                     )}
-                    <p className="text-xl font-bold text-indigo-600 mt-1">{brl(valorParcela)}<span className="text-xs font-normal text-gray-400">/mês</span></p>
+                    <p className={`text-xl font-bold mt-1 ${pago ? 'text-gray-400' : 'text-indigo-600'}`}>{brl(valorParcela)}<span className="text-xs font-normal text-gray-400">/mês</span></p>
                     <p className="text-xs text-gray-400 mt-0.5">Total: {brl(Number(divida.valor))}</p>
                 </div>
             </div>

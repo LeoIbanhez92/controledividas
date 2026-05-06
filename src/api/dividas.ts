@@ -1,5 +1,16 @@
 import { apiFetch } from './client';
 
+export type BandeiraCartao = 'santander' | 'itau' | 'banco_do_brasil' | 'nubank' | 'bradesco' | 'picpay';
+
+export const BANDEIRAS: { value: BandeiraCartao; label: string }[] = [
+  { value: 'nubank', label: 'Nubank' },
+  { value: 'itau', label: 'Itaú' },
+  { value: 'bradesco', label: 'Bradesco' },
+  { value: 'santander', label: 'Santander' },
+  { value: 'banco_do_brasil', label: 'Banco do Brasil' },
+  { value: 'picpay', label: 'PicPay' },
+];
+
 export interface Divida {
   id: number;
   descricao: string;
@@ -7,6 +18,7 @@ export interface Divida {
   quantidadeParcelas: number;
   dataVencimentoPrimeiraParcela: string;
   nomeTitular?: string;
+  bandeira?: BandeiraCartao | null;
 }
 
 export interface DividaDto {
@@ -15,6 +27,7 @@ export interface DividaDto {
   quantidadeParcelas: number;
   dataVencimentoPrimeiraParcela: string;
   nomeTitular?: string;
+  bandeira?: BandeiraCartao | null;
 }
 
 export const getDividas = () => apiFetch<Divida[]>('/dividas');

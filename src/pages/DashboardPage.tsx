@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useInactivityLogout } from '../hooks/useInactivityLogout';
 import type { Divida, DividaDto } from '../api/dividas';
 import {
     getDividas,
     createDivida,
     updateDivida,
     deleteDivida,
+    BANDEIRAS,
 } from '../api/dividas';
 import type { DividaFixa, DividaFixaDto } from '../api/dividasFixas';
 import {
@@ -24,6 +26,7 @@ const brl = (value: number) =>
 
 export function DashboardPage() {
     const { logout } = useAuth();
+    useInactivityLogout(logout);
     const [dividas, setDividas] = useState<Divida[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -37,10 +40,29 @@ export function DashboardPage() {
     const [editingFixa, setEditingFixa] = useState<DividaFixa | null>(null);
     const [deleteFixaId, setDeleteFixaId] = useState<number | null>(null);
 
-    // Pagas no mês atual (localStorage)
+    // Pagas no mês atual (localStorage) — dívidas fixas
     const getMesKey = () => { const n = new Date(); return `dividas-fixas-pagas-${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; };
     const loadPagas = (): Set<number> => { try { const r = localStorage.getItem(getMesKey()); return r ? new Set(Object.keys(JSON.parse(r)).map(Number)) : new Set(); } catch { return new Set(); } };
     const [pagasIds, setPagasIds] = useState<Set<number>>(loadPagas);
+
+    // Pagas no mês atual (localStorage) — dívidas de cartão
+    const getMesCartaoKey = () => { const n = new Date(); return `dividas-cartao-pagas-${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; };
+    const loadPagasCartao = (): Set<number> => { try { const r = localStorage.getItem(getMesCartaoKey()); return r ? new Set(Object.keys(JSON.parse(r)).map(Number)) : new Set(); } catch { return new Set(); } };
+    const [pagasCartaoIds, setPagasCartaoIds] = useState<Set<number>>(loadPagasCartao);
+
+    const handleToggleGrupo = (ids: number[]) => {
+        const key = getMesCartaoKey();
+        const raw = localStorage.getItem(key);
+        const obj: Record<number, boolean> = raw ? JSON.parse(raw) : {};
+        const todosPagos = ids.every((id) => obj[id]);
+        if (todosPagos) {
+            ids.forEach((id) => delete obj[id]);
+        } else {
+            ids.forEach((id) => { obj[id] = true; });
+        }
+        localStorage.setItem(key, JSON.stringify(obj));
+        setPagasCartaoIds(new Set(Object.keys(obj).map(Number)));
+    };
 
     const handleTogglePaga = (id: number) => {
         const key = getMesKey();
@@ -55,7 +77,18 @@ export function DashboardPage() {
         setError('');
         try {
             const [data, fixas] = await Promise.all([getDividas(), getDividasFixas()]);
-            setDividas(data);
+
+            // Apagar dívidas cuja última parcela já passou
+            const hoje = new Date();
+            const mesAtual = hoje.getFullYear() * 12 + hoje.getMonth();
+            const vencidas = data.filter((d) => {
+                const primeiro = new Date(d.dataVencimentoPrimeiraParcela + (d.dataVencimentoPrimeiraParcela.includes('T') ? '' : 'T00:00:00'));
+                const mesUltima = (primeiro.getFullYear() * 12 + primeiro.getMonth()) + (Number(d.quantidadeParcelas) - 1);
+                return mesUltima < mesAtual;
+            });
+            await Promise.all(vencidas.map((d) => deleteDivida(d.id)));
+            const vencidasIds = new Set(vencidas.map((d) => d.id));
+            setDividas(data.filter((d) => !vencidasIds.has(d.id)));
             setDividasFixas(fixas);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Erro ao carregar dívidas');
@@ -136,15 +169,18 @@ export function DashboardPage() {
         (sum, d) => sum + Number(d.valor) / Number(d.quantidadeParcelas),
         0
     );
-    const totalGeral = totalCartaoMensal + totalFixasMensal - totalFixasPagas;
+    const totalCartaoPago = dividas
+        .filter((d) => pagasCartaoIds.has(d.id))
+        .reduce((sum, d) => sum + Number(d.valor) / Number(d.quantidadeParcelas), 0);
+    const totalGeral = totalCartaoMensal - totalCartaoPago + totalFixasMensal - totalFixasPagas;
 
-    // Agrupar dívidas por titular
-    const dividasPorTitular: { titular: string; itens: typeof dividas }[] = [];
-    const semTitular = dividas.filter((d) => !d.nomeTitular);
-    const comTitular = dividas.filter((d) => d.nomeTitular);
-    const titulares = [...new Set(comTitular.map((d) => d.nomeTitular as string))];
-    titulares.forEach((t) => dividasPorTitular.push({ titular: t, itens: comTitular.filter((d) => d.nomeTitular === t) }));
-    if (semTitular.length > 0) dividasPorTitular.push({ titular: '', itens: semTitular });
+    // Agrupar dívidas por bandeira
+    const dividasPorBandeira: { bandeira: string | null; label: string; itens: typeof dividas }[] = [];
+    const bandeirasUsadas = [...new Set(dividas.map((d) => d.bandeira ?? null))];
+    bandeirasUsadas.forEach((b) => {
+        const label = b ? (BANDEIRAS.find((x) => x.value === b)?.label ?? b) : 'Sem bandeira';
+        dividasPorBandeira.push({ bandeira: b, label, itens: dividas.filter((d) => (d.bandeira ?? null) === b) });
+    });
 
     return (
         <div className="min-h-screen w-full relative overflow-x-hidden" style={{ backgroundImage: "url('/A%20m%C3%A3o%20do%20homem%20de%20neg%C3%B3cios%20segura%20o%20modelo%20da%20casa%20que%20poupa%20uma%20pequena%20casa_%20_%20Foto%20Gr%C3%A1tis.jpg')", backgroundSize: 'cover', backgroundPosition: 'center' }}>
@@ -236,22 +272,34 @@ export function DashboardPage() {
                     </div>
                 )}
 
-                {/* Debt list grouped by titular */}
+                {/* Debt list grouped by bandeira */}
                 {!loading && dividas.length > 0 && (
                     <div className="space-y-6">
-                        {dividasPorTitular.map(({ titular, itens }) => {
-                            const subtotal = itens.reduce((s, d) => s + Number(d.valor), 0);
+                        {dividasPorBandeira.map(({ bandeira, label, itens }) => {
+                            const subtotalMensal = itens.reduce((s, d) => s + Number(d.valor) / Number(d.quantidadeParcelas), 0);
+                            const ids = itens.map((d) => d.id);
+                            const todosPagos = ids.length > 0 && ids.every((id) => pagasCartaoIds.has(id));
                             return (
-                                <div key={titular || '__sem__'}>
+                                <div key={bandeira ?? '__sem__'}>
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-base">{titular ? '👤' : '📋'}</span>
-                                            <span className="text-sm font-semibold text-gray-700">
-                                                {titular || 'Sem titular'}
-                                            </span>
+                                            <span className="text-base">💳</span>
+                                            <span className="text-sm font-semibold text-gray-700">{label}</span>
+                                            <button
+                                                onClick={() => handleToggleGrupo(ids)}
+                                                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                                                    todosPagos ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-green-50 hover:text-green-600'
+                                                }`}
+                                                title={todosPagos ? 'Desmarcar fatura paga' : 'Marcar fatura como paga'}
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="20 6 9 17 4 12" />
+                                                </svg>
+                                                {todosPagos ? 'Pago' : 'Pagar'}
+                                            </button>
                                         </div>
                                         <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">
-                                            {subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            {brl(subtotalMensal)}/mês
                                         </span>
                                     </div>
                                     <div className="grid gap-4 sm:grid-cols-2">
@@ -259,6 +307,7 @@ export function DashboardPage() {
                                             <DividaCard
                                                 key={divida.id}
                                                 divida={divida}
+                                                pago={pagasCartaoIds.has(divida.id)}
                                                 onEdit={handleEdit}
                                                 onDelete={(id) => setDeleteConfirmId(id)}
                                             />

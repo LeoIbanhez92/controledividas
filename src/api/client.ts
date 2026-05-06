@@ -15,6 +15,11 @@ export async function apiFetch<T>(
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith('/auth')) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      throw new Error('Sessão expirada');
+    }
     let message = `Erro ${res.status}`;
     try {
       const text = await res.text();
